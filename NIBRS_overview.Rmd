@@ -1,0 +1,82 @@
+---
+title: "NIBRS Data Overview"
+output: pdf_document
+---
+
+## Facts
+
+* NIBRS is an annual nation-wide data collection effort wherein police agencies across the USA voluntarily report their crime data to the FBI.
+* NIBRS is available from 1991 to 2020 as of the writing of this document.
+* Starting in 2021, the FBI will no longer collect UCR data. Moving forward, NIBRS will be the only data they collect and provide concerning national level trends in crime. NIBRS is **backwards compatible** with the UCR meaning NIBRS provides researchers with a superset of what the UCR provided researchers. NIBRS can be made commensurable with the UCR as a result. 
+* While NIBRS is much more comprehensive and detailed than the UCR, it also has much less coverage. Because data reporting is voluntary, not all police agencies report. While the UCR typically had very high response rates (around 95%), [NIBRS only has had around a 30% - 60% response rate](https://www.theatlantic.com/ideas/archive/2022/05/fbi-crime-data-nibrs-2021/629797/) in any given year. This means only 30% - 60% of all police agencies reported their data according to NIBRS's more demanding standards.
+* Moving forward, any police agency which does not report their data according to NIBRS's standards will be a missing data point. This means for roughly 40% - 70% of the nation, we will not have systematic crime data available. Those missing police agencies **might** make their crime data public through other means (e.g. through that police department's own local website), but there are no guarantees it will be commensurable with the NIBRS national-level data.
+
+## Crime categories
+
+* NIBRS has two categories of crime: **Group A** and **Group B**.
+* Group A Crimes have information available on the victim, the offender, the offense, the arrestee (only available when an arrest is made), and any property stolen or damaged (or for drug crimes if they were seized by the police). Of course, this data can be missing if the police did not report it or were not able to capture that information. Nevertheless, this data is all theoretically available. There is a [long list](https://nibrsbook.com/overview-of-the-data.html#group-a-crimes) of crimes covered in the Group A category which would be redundant to list here in its entirety here but to demonstrate the range of crimes available a few will be listed here: aggravated assault, arson, animal cruelty, bribery, identity theft, rape, robbery, sports tampering, and welfare fraud.
+* For Group B crimes, we only have information available on the arrestee meaning we only know about these crimes when an arrest is made. When an arrest is not made, they are not reported. Group B offenses **typically** but not always do not have a specific victim as they include such offenses as disorderly conduct, loitering, and public drunkenness.
+
+## Differences between UCR and NIBRS data
+
+* There are many differences between the two data sets. This section will primarily cover those instances in which UCR data actually provides some advantages over NIBRS data.
+* UCR data has information on **unfounded** crimes or incidents in which a crime was reported, but then later it was retracted e.g. you lost your wallet and believe it was stolen only to find it later. Unfounded crimes typically only constituted around 1% - 2% of all crime in any given category of crime so this is likely not a big loss. The one exception is in the rape category where around 10% of all rape crimes were **unfounded** (although it is possible that many of these incidents reflected an actual rape that happened but the victims retracted their claim for a variety of reasons). Losing unfounded rapes is a real loss then to the validity of the NIBRS crime data as a great deal of actual rapes are likely now not being captured.
+* A section of the UCR was the Law Enforcement Officers Killed and Assaulted (LEOKA) segment. This segment contained detailed information on police officers who were killed and assaulted either accidentally or in the line of duty. NIBRS still has information on crimes committed against officers, but it does not have as much detail as LEOKA had (e.g. if the officers were injured accidentally or in the line of duty).
+
+## NIBRS Structure
+
+![Conceptual Breakdown of NIBRS](nibrs_data_generating.png)
+
+* Crime is discovered or reported to the police.
+* The police agency then must report the crime to the FBI. Not all crime in all police agencies is reported (e.g. some police agencies may only report certain months) because it is voluntary although some states have mandated that police agencies report.
+* Crime is then recorded as a Group B crime (not as much information is captured) or a Group A crime (lots of information is captured).
+
+### Segments
+
+* **Administrative Segment**:  This segment provides information about other segments, and it is the only **incident-level** segment of the collection. It provides information that is consistent across every offense in the incident such as the incident date and time. It also includes the type of clearance for the incident. It also tells us how many of the offense, offender, victim, and property segments are associated with the incident (i.e. how many offenders, how many victims, the offenses committed, the property damaged, stolen, or seized and its monetary value). There are always at least one of these segments per incident, but there can potentially be multiple of each segment.
+* The other segments are rather self-explanatory. An important point is that the arrestee segment is not necessarily a subset of the offender segment. For example, police may initially think two people committed a crime but in reality they later arrest three people for it. The third person might show up in the arrestee category but not the offender category although this is very rare (and in fact may never happen as it seems as if police agencies simply add that person retroactively to the offender segment). It may also be the case that the person suspected of the crime is not the person who winds up getting arrested.
+* **Other differences between arrestee and offender segment**: The crime the arrestee is arrested for (which may be different from the crime committed in the offense since an arrest can be made for multiple incidents). The type of arrest is also captured (e.g. police viewed the crime, the result of a warrant, citation, handled within department is for juveniles who are not formally sanctioned, and referred to other department which is also for juveniles who may have been handed over to an agency like the juvenile court).
+* Another important point to note is that when information is unknown (e.g. the offender is unknown) a placeholder row is added wherein all information is listed as unknown. It is not clear, though, if it is known that there is **only one** e.g. offender and all information about them is unknown **or if there is nothing known about them** including how many there were.
+* **Window segments**: These are very rare, and they represent crimes which happened before the agency started reporting to NIBRS, but the arrest is reported using NIBRS.
+* Each segment has an agency identifier code (ORI) and an incident number. Incident numbers are not unique so to uniquely identify an incident you need the agency identifier code and the incident number.
+* **Offense Segment**
+    * Crime type and sub-type.
+    * Was the crime completed or merely attempted?
+    * Location of the crime (categorical).
+    * Was a weapon used?
+    * Hate crime binary indicator.
+* **Offender Segment**
+    * Age. Agencies can enter a range if they are unsure of the exact age (e.g. 20 - 29) in which case the FBI simply averages the range.
+    * Sex: M/F.
+    * Race: White, Black, AIAN, AAPI. People cannot be labeled as mixed race, and unless someone is arrested and their race is asked the racial identity is inferred.
+* **Victim Segment**
+    * Type of crime suffered. Usually the most serious crime is listed first but not always (appears to be a data entry issue). Victims can have up to 10 crimes reported.
+    * Victim type (e.g. individual, business).
+    * Victim injury (e.g. apparent minor injuries, possible internal injury, other major injury) based on victims reports and officer observations. Up to 5 can be reported.
+    * Relationship to offender which can be classified into three broad categories (legal family members, people known to the victim but who aren’t family, and people not known to the victim) although there are 27 possible categories.
+    * Motive (available only for aggravated assaults and homicide). E.g. argument, domestic violence, drug dealing, gangland, accident.
+    * Resident status i.e. does the victim live in the police jurisdiction where they were victimized?
+    * Age
+    * Sex
+    * Race (same categories for offender).
+    * Ethnicity (Hispanic or not Hispanic). This is an optional variable so agencies do not have to report it. This makes this variable tricky to use. Check to ensure the agency consistently uses this variable.
+* **Arrestee Segment**
+    * Crime arrested for.
+    * Date of arrest (and by extension, time from the crime commission to the arrest).
+    * What weapon (if any) was the arrestee carrying when they were arrested?
+    * Type of arrest:
+        * On-view (officer arrested them at the scene of the crime).
+        * Warrant/Previous Incident Report (Arrested someone on a warrant, arrested someone who was a suspect for other, previous crimes).
+            * Multiple arrestee indicator (individual is responsible for multiple incidents cleared so we avoid counting them twice).
+        * Summoned/Cited (not really an arrest).
+        * Disposition of juvenile arrestee (referred to another organization or handled within department).
+    * Residence of arrestee is within the jurisdiction of police agency that arrested them. This can be subjected to quite a bit of variation in definition. Use of driver's license (may not be accurate)? Ask the arrestee (they could lie)? For the homeless it may not be well defined.
+    * Age.
+    * Sex.
+    * Race.
+    * Ethnicity.
+
+## Quirks of the data
+
+* When breaking down crime by day of the month, one will notice that a disproportionate number of crimes occur on the first of the month. This is likely due to the fact that police departments **have to** report a date for each incident, and if they do not know the date, they simply put the first of the month. Similar quirks occur around noon and midnight which are probably also the default times police departments put when they do now know the time the crime incident took place.
+* In theory, all police agencies are supposed to report the same crimes i.e. every police agency should be using the same definition of said crime. In reality, this is quite obviously not the case, but it also presents some challenges for quantitative research. For example, animal cruelty was introduced as a crime category in NIBRS starting in 2018 and reporting has been concentrated in only a few states. This means certain states decided not to or have been unable to report these crimes. Similarly rape underwent a definition change in 2013, but for many jurisdictions the reported amount of rapes remained the same suggesting many police agencies did not update their own definitions of rape.
