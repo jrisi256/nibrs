@@ -54,15 +54,14 @@ sex_crimes_count <-
               nr_agencies = length(unique(ori))) %>%
     ungroup() %>%
     mutate(count_rate = count / nr_agencies * 10) %>%
-    filter(nr_agencies >= median(nr_agencies)) %>%
-    mutate(year = as.numeric(year))
+    filter(nr_agencies >= median(nr_agencies))
 
 ggplot(sex_crimes_count, aes(x = year, y = count_rate)) +
-    geom_point() +
-    geom_line(aes(group = state)) +
+    geom_line(aes(group = state, color = state)) +
     facet_wrap(~state, scales = "free") +
     theme_bw() +
-    scale_x_continuous(breaks = seq(1991, 2020, 5), limits = c(1991, 2020))
+    scale_x_continuous(breaks = seq(1991, 2020, 7), limits = c(1991, 2020)) +
+    geom_vline(xintercept = 2017)
 
 ggplot(sex_crimes_count, aes(x = year, y = count)) +
     geom_point() +
