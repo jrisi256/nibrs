@@ -40,3 +40,4 @@ vignettes/*.pdf
 
 # Data
 /clean-and-process/input/
+/clean-and-process/output/
