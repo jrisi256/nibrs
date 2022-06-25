@@ -2,7 +2,9 @@ library(here)
 library(dplyr)
 library(tidyr)
 library(arrow)
+library(purrr)
 library(stringr)
+library(ggplot2)
 library(lubridate)
 
 # Create output directory for parquet files
@@ -72,7 +74,7 @@ sex_crimes <- c("rape", "sodomy", "incest", "statutory rape",
                 "human trafficking - commercial sex acts",
                 "fondling (incident liberties/child molest)")
 
-# Read in sexual crimes and aggregate to the incident date level
+# Read in sexual crime victims and aggregate to the incident date level
 sexual_crimes <-
     nibrs %>%
     filter(ucr_offense_code_1 %in% sex_crimes |
@@ -85,12 +87,16 @@ sexual_crimes <-
                ucr_offense_code_8 %in% sex_crimes |
                ucr_offense_code_9 %in% sex_crimes |
                ucr_offense_code_10 %in% sex_crimes) %>%
-    group_by(incident_date, state, ori) %>%
-    summarise(count = n()) %>%
-    collect() %>%
-    ungroup()
+    mutate(incident_date = strptime(incident_date, "%Y-%m-%d"),
+           year = arrow_year(incident_date),
+           month = arrow_month(incident_date)) %>%
+    group_by(year, month, state, ori) %>%
+    summarise(monthly_reported_crime = n()) %>%
+    ungroup() %>%
+    mutate(crime_type = "sexual") %>%
+    collect()
 
-# Read in non-sexual crimes and aggregate to the incident date level
+# Read in non-sexual crime victims and aggregate to the incident date level
 non_sexual_crimes <-
     nibrs %>%
     filter(!(ucr_offense_code_1 %in% sex_crimes) &
@@ -103,40 +109,167 @@ non_sexual_crimes <-
                !(ucr_offense_code_8 %in% sex_crimes) &
                !(ucr_offense_code_9 %in% sex_crimes) &
                !(ucr_offense_code_10 %in% sex_crimes)) %>%
-    group_by(incident_date, state, ori) %>%
-    summarise(count = n()) %>%
-    collect() %>%
-    ungroup()
+    mutate(incident_date = strptime(incident_date, "%Y-%m-%d"),
+           year = arrow_year(incident_date),
+           month = arrow_month(incident_date)) %>%
+    group_by(year, month, state, ori) %>%
+    summarise(monthly_reported_crime = n()) %>%
+    ungroup() %>%
+    mutate(crime_type = "non-sexual") %>%
+    collect()
 
-sexual_crimes_mem <-
+# Combine sexual and non sexual crimes
+monthly_reporting_agencies <-
+    nibrs %>%
+    mutate(incident_date = strptime(incident_date, "%Y-%m-%d"),
+           year = arrow_year(incident_date),
+           month = arrow_month(incident_date)) %>%
+    distinct(ori, year, month) %>%
+    collect()
+
+# 
+# group_by(ori) %>%
+#     summarise(months_reported = n(),
+#               earliest_year = min(year)) %>%
+#     ungroup() %>%
+#     collect()
+
+# Create_All_Dates <- function(start_year, end_year) {
+#     
+#     seq(ymd(paste0(start_year, "-01-01")),
+#         ymd(paste0(end_year, "-12-31")),
+#         by = "month")
+# }
+
+Find_Agencies_Reporting <- function(agencies_df, start_year, end_year) {
+    
+    unique_agencies <-
+        agencies_df %>%
+        filter(year == start_year) %>%
+        summarise(w = unique(ori)) %>%
+        pull(w)
+    
+    count <-
+        agencies_df %>%
+        filter(ori %in% unique_agencies & year >= start_year & year <= end_year) %>%
+        group_by(ori) %>%
+        summarise(months_reported = n()) %>%
+        ungroup()
+    
+    total_months <- (end_year - start_year + 1) * 12
+    nr_complete <- count %>% filter(months_reported == total_months) %>% nrow()
+    
+    title <- paste0("PDF and CDF for the number of months each police agency reported to NIBRS\n",
+                    "Total Number of Police Agencies: ", length(unique_agencies), "\n",
+                    "Total Number of Months: ", total_months, "\n",
+                    "Total Number of Police Agencies Reporting All Months: ", nr_complete, "\n",
+                    "Total Number of Complete Observations: ", total_months * nr_complete, "\n",
+                    "Years: ", start_year, " - ", end_year)
+    
+    g <-
+        ggplot(count, aes(x = months_reported)) +
+        stat_ecdf(geom = "line") +
+        theme_bw() +
+        geom_histogram(aes(y = ..count.. / sum(..count..)), alpha = 0.5) +
+        scale_x_continuous(breaks = ~ pretty(.x)) + 
+        labs(x = "Number of Months Reported",
+             y = "Proportion of Agencies Reporting",
+             title = title)
+    
+    return(list(df = count, graph = g))
+}
+
+start_years <- 1991:2020
+names(start_years) <- paste0("year_", start_years)
+
+months_reporting <- map(start_years,
+                        Find_Agencies_Reporting,
+                        agencies_df = monthly_reporting_agencies,
+                        end_year = 2020)
+
+pdf(here("plots.pdf"), onefile = T)
+map(months_reporting, 2)
+dev.off()
+
+# Based on PDF, I am going to use years 2005 and 2014.
+agencies_2005 <-
+    months_reporting$year_2005$df %>%
+    filter(months_reported == max(months_reported)) %>%
+    pull(ori)
+
+agencies_2014 <-
+    months_reporting$year_2014$df %>%
+    filter(months_reported == max(months_reported)) %>%
+    pull(ori)
+
+sexual_crimes_2005 <-
     sexual_crimes %>%
-    mutate(incident_date = ymd(incident_date),
-           year = year(incident_date),
-           month = month(incident_date),
-           day = day(incident_date),
-           round_month = floor_date(incident_date, "month")) %>%
-    group_by(state, ori, round_month) %>%
-    summarise(count = sum(count),
-              nr_agencies = length(unique(ori))) %>%
-    ungroup()
+    filter(ori %in% agencies_2005) %>%
+    mutate(year_month = ym(paste0(year, "-", month))) %>%
+    filter(year >= 2005) %>%
+    count(state, year_month, crime_type, wt = monthly_reported_crime)
 
-non_sexual_crimes_mem <-
+non_sexual_crimes_2005 <-
     non_sexual_crimes %>%
-    mutate(incident_date = ymd(incident_date),
-           year = year(incident_date),
-           month = month(incident_date),
-           day = day(incident_date),
-           round_month = floor_date(incident_date, "month")) %>%
-    group_by(state, ori, round_month) %>%
-    summarise(count = sum(count),
-              nr_agencies = length(unique(ori))) %>%
-    ungroup()
+    filter(ori %in% agencies_2005) %>%
+    mutate(year_month = ym(paste0(year, "-", month))) %>%
+    filter(year >= 2005) %>%
+    count(state, year_month, crime_type, wt = monthly_reported_crime)
 
-all_dates <- seq(ymd("1991-01-01"), ymd("2020-12-31"), by = "month")
-all_agencies <- unique(c(unique(sexual_crimes_mem$ori),
-                         unique(non_sexual_crimes_mem$ori)))
-cross_dates_agencies <- crossing(all_dates, all_agencies)
+crimes_2005 <- bind_rows(sexual_crimes_2005, non_sexual_crimes_2005)
 
-sexual_crimes_mem <- full_join(sexual_crimes_mem, cross_dates_agencies,
-                               by = c("ori" = "all_agencies", 
-                                      "round_month" = "all_dates"))
+indexed_crimes_2005 <-
+    crimes_2005 %>%
+    filter(year_month == "2005-01-01") %>%
+    rename(index = n) %>%
+    select(-year_month) %>%
+    full_join(crimes_2005, by = c("state", "crime_type")) %>%
+    mutate(new_n = n / index)
+
+ggplot(indexed_crimes_2005, aes(x = year_month, y = new_n)) +
+    geom_line(aes(group = crime_type, color = crime_type)) +
+    theme_bw() +
+    geom_vline(xintercept = as.numeric(ymd("2017-10-01"))) +
+    facet_wrap(~state, scales = "free")
+
+##############################
+sexual_crimes_2014 <-
+    sexual_crimes %>%
+    filter(ori %in% agencies_2014) %>%
+    mutate(year_month = ym(paste0(year, "-", month))) %>%
+    filter(year >= 2014) %>%
+    count(state, year_month, crime_type, wt = monthly_reported_crime)
+
+non_sexual_crimes_2014 <-
+    non_sexual_crimes %>%
+    filter(ori %in% agencies_2014) %>%
+    mutate(year_month = ym(paste0(year, "-", month))) %>%
+    filter(year >= 2014) %>%
+    count(state, year_month, crime_type, wt = monthly_reported_crime)
+
+crimes_2014 <- bind_rows(sexual_crimes_2014, non_sexual_crimes_2014)
+
+indexed_crimes_2014 <-
+    crimes_2014 %>%
+    filter(year_month == "2014-01-01") %>%
+    rename(index = n) %>%
+    select(-year_month) %>%
+    full_join(crimes_2014, by = c("state", "crime_type")) %>%
+    mutate(dummy = 1) %>%
+    pivot_wider(names_from = crime_type,
+                values_from = dummy,
+                values_fill = list(dummy = 0)) %>%
+    mutate(new_n = n / index,
+           year = year(year_month),
+           month = month(year_month),
+           post_metoo = if_else(year_month >= "2017-10-01", 0, 1))
+    
+
+ggplot(indexed_crimes_2014, aes(x = year_month, y = new_n)) +
+    geom_line(aes(group = crime_type, color = crime_type)) +
+    theme_bw() +
+    geom_vline(xintercept = as.numeric(ymd("2017-10-01"))) +
+    facet_wrap(~state, scales = "free")
+
+regression <- lm(n ~ sexual + post_metoo + post_metoo * sexual + state +
+                     + as.factor(month), data = indexed_crimes_2014)
