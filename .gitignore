@@ -39,5 +39,5 @@ vignettes/*.pdf
 .Renviron
 
 # Data
-/clean-and-process/input/
-/clean-and-process/output/
+*/input/
+*/output/
