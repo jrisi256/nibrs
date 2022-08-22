@@ -187,7 +187,7 @@ months_reporting <- map(start_years,
                         agencies_df = monthly_reporting_agencies,
                         end_year = 2020)
 
-pdf(here("plots.pdf"), onefile = T)
+pdf(here("src", "plots.pdf"), onefile = T)
 map(months_reporting, 2)
 dev.off()
 
