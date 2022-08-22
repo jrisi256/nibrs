@@ -207,30 +207,57 @@ sexual_crimes_2005 <-
     filter(ori %in% agencies_2005) %>%
     mutate(year_month = ym(paste0(year, "-", month))) %>%
     filter(year >= 2005) %>%
-    count(state, year_month, crime_type, wt = monthly_reported_crime)
+    count(ori, state, year_month, crime_type, wt = monthly_reported_crime)
 
 non_sexual_crimes_2005 <-
     non_sexual_crimes %>%
     filter(ori %in% agencies_2005) %>%
     mutate(year_month = ym(paste0(year, "-", month))) %>%
     filter(year >= 2005) %>%
-    count(state, year_month, crime_type, wt = monthly_reported_crime)
+    count(ori, state, year_month, crime_type, wt = monthly_reported_crime)
 
-crimes_2005 <- bind_rows(sexual_crimes_2005, non_sexual_crimes_2005)
+all_dates_2005 <-
+    tibble(year_month = seq(ymd("2005-01-01"), ymd("2020-12-31"), by = "month"),
+           temp = 1)
 
-indexed_crimes_2005 <-
-    crimes_2005 %>%
-    filter(year_month == "2005-01-01") %>%
-    rename(index = n) %>%
-    select(-year_month) %>%
-    full_join(crimes_2005, by = c("state", "crime_type")) %>%
-    mutate(new_n = n / index)
+all_dates_2014 <-
+    tibble(year_month = seq(ymd("2014-01-01"), ymd("2020-12-31"), by = "month"),
+           temp = 1)
 
-ggplot(indexed_crimes_2005, aes(x = year_month, y = new_n)) +
-    geom_line(aes(group = crime_type, color = crime_type)) +
-    theme_bw() +
-    geom_vline(xintercept = as.numeric(ymd("2017-10-01"))) +
-    facet_wrap(~state, scales = "free")
+cross_join_2005 <-
+    tibble(ori = agencies_2005, temp = 1, sexual = 1) %>%
+    full_join(all_dates_2005, by = "temp") %>%
+    dplyr::select(-temp)
+
+cross_join_2014 <-
+    tibble(ori = agencies_2014, temp = 1, sexual = 1) %>%
+    full_join(all_dates_2014, by = "temp") %>%
+    dplyr::select(-temp)
+
+crimes_2005 <-
+    bind_rows(sexual_crimes_2005, non_sexual_crimes_2005) %>%
+    mutate(dummy = 1) %>%
+    pivot_wider(names_from = crime_type,
+                values_from = dummy,
+                values_fill = list(dummy = 0)) %>%
+    mutate(month = as.factor(month(year_month)),
+           post_metoo = if_else(year_month >= "2017-10-01", 0, 1)) %>%
+    full_join(cross_join_2005, by = c("ori", "year_month", "sexual")) %>%
+    mutate(if_else(is.na(n), 0L, n))
+
+# indexed_crimes_2005 <-
+#     crimes_2005 %>%
+#     filter(year_month == "2005-01-01") %>%
+#     rename(index = n) %>%
+#     select(-year_month) %>%
+#     full_join(crimes_2005, by = c("state", "crime_type")) %>%
+#     mutate(new_n = n / index)
+# 
+# ggplot(indexed_crimes_2005, aes(x = year_month, y = new_n)) +
+#     geom_line(aes(group = crime_type, color = crime_type)) +
+#     theme_bw() +
+#     geom_vline(xintercept = as.numeric(ymd("2017-10-01"))) +
+#     facet_wrap(~state, scales = "free")
 
 ##############################
 sexual_crimes_2014 <-
@@ -238,38 +265,61 @@ sexual_crimes_2014 <-
     filter(ori %in% agencies_2014) %>%
     mutate(year_month = ym(paste0(year, "-", month))) %>%
     filter(year >= 2014) %>%
-    count(state, year_month, crime_type, wt = monthly_reported_crime)
+    count(ori, state, year_month, crime_type, wt = monthly_reported_crime)
 
 non_sexual_crimes_2014 <-
     non_sexual_crimes %>%
     filter(ori %in% agencies_2014) %>%
     mutate(year_month = ym(paste0(year, "-", month))) %>%
     filter(year >= 2014) %>%
-    count(state, year_month, crime_type, wt = monthly_reported_crime)
+    count(ori, state, year_month, crime_type, wt = monthly_reported_crime)
 
-crimes_2014 <- bind_rows(sexual_crimes_2014, non_sexual_crimes_2014)
-
-indexed_crimes_2014 <-
-    crimes_2014 %>%
-    filter(year_month == "2014-01-01") %>%
-    rename(index = n) %>%
-    select(-year_month) %>%
-    full_join(crimes_2014, by = c("state", "crime_type")) %>%
+crimes_2014 <-
+    bind_rows(sexual_crimes_2014, non_sexual_crimes_2014) %>%
     mutate(dummy = 1) %>%
     pivot_wider(names_from = crime_type,
                 values_from = dummy,
                 values_fill = list(dummy = 0)) %>%
-    mutate(new_n = n / index,
-           year = year(year_month),
-           month = month(year_month),
-           post_metoo = if_else(year_month >= "2017-10-01", 0, 1))
-    
+    mutate(month = as.factor(month(year_month)),
+           post_metoo = if_else(year_month >= "2017-10-01", 0, 1)) %>%
+    full_join(cross_join_2005, by = c("ori", "year_month", "sexual")) %>%
+    mutate(if_else(is.na(n), 0L, n))
 
-ggplot(indexed_crimes_2014, aes(x = year_month, y = new_n)) +
-    geom_line(aes(group = crime_type, color = crime_type)) +
-    theme_bw() +
-    geom_vline(xintercept = as.numeric(ymd("2017-10-01"))) +
-    facet_wrap(~state, scales = "free")
+# indexed_crimes_2014 <-
+#     crimes_2014 %>%
+#     filter(year_month == "2014-01-01") %>%
+#     rename(index = n) %>%
+#     select(-year_month) %>%
+#     full_join(crimes_2014, by = c("state", "crime_type")) %>%
+#     mutate(dummy = 1) %>%
+#     pivot_wider(names_from = crime_type,
+#                 values_from = dummy,
+#                 values_fill = list(dummy = 0)) %>%
+#     mutate(new_n = n / index,
+#            year = year(year_month),
+#            month = month(year_month),
+#            post_metoo = if_else(year_month >= "2017-10-01", 0, 1))
+#     
+# 
+# ggplot(indexed_crimes_2014, aes(x = year_month, y = new_n)) +
+#     geom_line(aes(group = crime_type, color = crime_type)) +
+#     theme_bw() +
+#     geom_vline(xintercept = as.numeric(ymd("2017-10-01"))) +
+#     facet_wrap(~state, scales = "free")
 
-regression <- lm(n ~ sexual + post_metoo + post_metoo * sexual + state +
-                     + as.factor(month), data = indexed_crimes_2014)
+ols_2005 <-
+    lm(n ~ sexual + post_metoo + sexual * post_metoo + state + month,
+       data = crimes_2005)
+
+ols_2014 <-
+    lm(n ~ sexual + post_metoo + sexual * post_metoo + state + month,
+       data = crimes_2014)
+
+library(MASS)
+negbn_2005 <-
+    glm.nb(n ~ sexual + post_metoo + sexual * post_metoo + state + month,
+           data = crimes_2005)
+
+negbn_2014 <-
+    glm.nb(n ~ sexual + post_metoo + sexual * post_metoo + state + month,
+           data = crimes_2014)
