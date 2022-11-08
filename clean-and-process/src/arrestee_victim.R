@@ -7,8 +7,6 @@ library(stringr)
 library(ggplot2)
 library(forcats)
 
-print('test')
-
 # Directory for parquet files
 arrestees_dir <- here("clean-and-process",
                       "output",
