@@ -20,7 +20,7 @@ victims_dir <- here("clean-and-process",
   
 ######################################################## Schema for victims
 victim_schema <- schema(ori = string(),
-                        year = string(),
+                        year = double(),
                         state = string(),
                         state_abb = string(),
                         incident_number = string(),
@@ -77,7 +77,7 @@ victim_schema <- schema(ori = string(),
 # ucr_arrest_offense_code, age_of_arrestee, sex_of_arrestee, race_of_arrestee,
 # ethnicity_of_arrestee, resident_status_of_arrestee, unique_incident_id
 arrestee_schema <- schema(ori = string(),
-                          year = string(),
+                          year = double(),
                           state = string(),
                           state_abb = string(),
                           incident_number = string(),
@@ -133,7 +133,6 @@ arrestees <-
                                  age_of_arrestee == -1 ~ "unknown"))
        
 ########################################################### Clean victim data
-# only keep individuals and officers, only ones with residential status.
 victims <-
     open_dataset(here(victims_dir), schema = victim_schema) %>%
     filter(type_of_victim %in% c("individual", "law enforcement officer")) %>%
@@ -161,6 +160,8 @@ victims <-
                                  age_of_victim >= 66 ~ "66 and older",
                                  age_of_victim == -1 ~ "unknown"))
 
+###############################################################################
+# Query the arrestee data for trends in residential status by demographic trends
 Query_Data_Arrestee <- function(.arrow_obj, ...) {
     
     .arrow_obj %>%
@@ -174,22 +175,6 @@ Query_Data_Arrestee <- function(.arrow_obj, ...) {
                      values_to = "status") %>%
         mutate(actor = if_else(actor == "resident_status_of_arrestee",
                                "arrestee",
-                               NA_character_))
-}
-
-Query_Data_Victim <- function(.arrow_obj, ...) {
-    
-    .arrow_obj %>%
-        count(resident_status_of_victim, ...) %>%
-        collect() %>%
-        group_by(...) %>%
-        mutate(prcnt = n / sum(n)) %>%
-        ungroup() %>%
-        pivot_longer(cols = resident_status_of_victim,
-                     names_to = "actor",
-                     values_to = "status") %>%
-        mutate(actor = if_else(actor == "resident_status_of_victim",
-                               "victim",
                                NA_character_))
 }
 
@@ -221,13 +206,109 @@ arrestees_crime_df <-
     filter(status == "resident") %>%
     mutate(ucr_arrest_offense_code = fct_reorder(ucr_arrest_offense_code, prcnt))
 
+pdf(here("clean-and-process", "output", "arrestees.pdf"),
+    width = 12,
+    height = 6)
+
+ggplot(arrestees_time_df, aes(x = year, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    theme_bw()
+
+ggplot(arrestees_race_df, aes(x = year, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    facet_wrap(~race_of_arrestee) +
+    theme_bw()
+
+ggplot(arrestees_ethnicity_df, aes(x = year, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    facet_wrap(~ethnicity_of_arrestee) +
+    theme_bw()
+
+ggplot(arrestees_sex_df, aes(x = year, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    facet_wrap(~sex_of_arrestee) +
+    theme_bw()
+
+ggplot(arrestees_age_df, aes(x = year, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    facet_wrap(~age_cat_a) +
+    theme_bw()
+
+arrestees_age_df %>%
+    filter(status == "resident") %>%
+    ggplot(aes(x = year, y = prcnt)) +
+    geom_point(aes(color = age_cat_a)) +
+    geom_line(aes(color = age_cat_a, group = age_cat_a)) +
+    facet_wrap(~status) +
+    theme_bw()
+
+arrestees_age_df %>%
+    count(age_cat_a, status, wt = n) %>%
+    group_by(age_cat_a) %>%
+    mutate(prcnt = n / sum(n)) %>%
+    filter(status == "resident") %>%
+    ggplot(aes(x = age_cat_a, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    theme_bw()
+
+ggplot(arrestees_state_time_df, aes(x = year, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    facet_wrap(~state) +
+    theme_bw()
+
+arrestees_state_time_df %>%
+    count(state, status, wt = n) %>%
+    group_by(state) %>%
+    mutate(prcnt = n / sum(n)) %>%
+    ungroup() %>%
+    filter(status == "resident") %>%
+    mutate(state = fct_reorder(state, prcnt)) %>%
+    ggplot(aes(x = state, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    theme_bw() +
+    theme(axis.text.x = element_text(hjust = 0, angle = 340))
+
+ggplot(arrestees_crime_df, aes(x = ucr_arrest_offense_code, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    theme_bw() +
+    theme(axis.text.x = element_text(hjust = 0, angle = 340))
+
+dev.off()
+
+###############################################################################
+# Query the victim data for trends in residential status by demographic trends
+Query_Data_Victim <- function(.arrow_obj, ...) {
+    
+    .arrow_obj %>%
+        count(resident_status_of_victim, ...) %>%
+        collect() %>%
+        group_by(...) %>%
+        mutate(prcnt = n / sum(n)) %>%
+        ungroup() %>%
+        pivot_longer(cols = resident_status_of_victim,
+                     names_to = "actor",
+                     values_to = "status") %>%
+        mutate(actor = if_else(actor == "resident_status_of_victim",
+                               "victim",
+                               NA_character_))
+}
+
 victims_df <- Query_Data_Victim(victims)
 victims_time_df <- Query_Data_Victim(victims, year)
 victims_race_df <- Query_Data_Victim(victims, race_of_victim, year)
 victims_ethnicity_df <- Query_Data_Victim(victims, ethnicity_of_victim, year)
 victims_sex_df <- Query_Data_Victim(victims, sex_of_victim, year)
 victims_age_df <- Query_Data_Victim(victims, age_cat_v, year)
-victims_state_df <- Query_Data_Victim(victims, state, year)
+victims_state_time_df <- Query_Data_Victim(victims, state, year)
 victims_crime_df <-
     victims %>%
     filter(ucr_offense_code_1 %in% c("drug/narcotic violations",
@@ -248,14 +329,89 @@ victims_crime_df <-
     Query_Data_Victim(ucr_offense_code_1) %>%
     filter(status == "resident") %>%
     mutate(ucr_offense_code_1 = fct_reorder(ucr_offense_code_1, prcnt))
-ggplot(victims_crime_df, aes(x = ucr_offense_code_1, y = prcnt)) + geom_point(aes(color = status)) +
+
+pdf(here("clean-and-process", "output", "victims.pdf"),
+    width = 12,
+    height = 6)
+
+ggplot(victims_time_df, aes(x = year, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    theme_bw()
+
+ggplot(victims_race_df, aes(x = year, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    facet_wrap(~race_of_victim) +
+    theme_bw()
+
+ggplot(victims_ethnicity_df, aes(x = year, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    facet_wrap(~ethnicity_of_victim) +
+    theme_bw()
+
+ggplot(victims_sex_df, aes(x = year, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    facet_wrap(~sex_of_victim) +
+    theme_bw()
+
+ggplot(victims_age_df, aes(x = year, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    facet_wrap(~age_cat_v) +
+    theme_bw()
+
+victims_age_df %>%
+    filter(status == "resident") %>%
+    ggplot(aes(x = year, y = prcnt)) +
+    geom_point(aes(color = age_cat_v)) +
+    geom_line(aes(color = age_cat_v, group = age_cat_v)) +
+    facet_wrap(~status) +
+    theme_bw()
+
+victims_age_df %>%
+    count(age_cat_v, status, wt = n) %>%
+    group_by(age_cat_v) %>%
+    mutate(prcnt = n / sum(n)) %>%
+    filter(status == "resident") %>%
+    ggplot(aes(x = age_cat_v, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    theme_bw()
+
+ggplot(victims_state_time_df, aes(x = year, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    facet_wrap(~state) +
+    theme_bw()
+
+victims_state_time_df %>%
+    count(state, status, wt = n) %>%
+    group_by(state) %>%
+    mutate(prcnt = n / sum(n)) %>%
+    ungroup() %>%
+    filter(status == "resident") %>%
+    mutate(state = fct_reorder(state, prcnt)) %>%
+    ggplot(aes(x = state, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    theme_bw() +
     theme(axis.text.x = element_text(hjust = 0, angle = 340))
+
+ggplot(victims_crime_df, aes(x = ucr_offense_code_1, y = prcnt)) +
+    geom_point(aes(color = status)) +
+    geom_line(aes(color = status, group = status)) +
+    theme_bw() +
+    theme(axis.text.x = element_text(hjust = 0, angle = 340))
+
+dev.off()
 
 ##################################### arrested vs. victim residential status
 ################ inner join captures incidents where the offender was arrested
 Join_Victim_Arrestee <- function(victims_arrow, arrestees_arrow, year_i) {
-    
-    year_i <- as.character(year_i)
+
     print(year_i)
     
     v <-
@@ -285,3 +441,15 @@ join <-
     group_by(year) %>%
     mutate(prcnt = n / sum(n)) %>%
     ungroup()
+
+pdf(here("clean-and-process", "output", "victims_and_arrestees.pdf"),
+    width = 12,
+    height = 6)
+
+ggplot(join, aes(x = year, y = prcnt)) +
+    geom_point() +
+    geom_line(aes(group = 1)) +
+    theme_bw() +
+    facet_wrap(~resident_status_of_victim + resident_status_of_arrestee)
+
+dev.off()
